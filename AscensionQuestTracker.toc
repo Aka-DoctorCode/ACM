@@ -3,7 +3,12 @@
 ## Notes: Minimalistic substitute for the default quest tracker.
 ## Author: AkaDoctorCode
 ## Version: 01
+## SavedVariables: AscensionQuestTrackerDB
 ## IconTexture: Interface\AddOns\AscensionNotes\Media\AkaDoctorCode.png
+
+Libs\Libs.xml
+Locales\enUS.lua
+Locales\ptBR.lua
 
 AscensionQuestTracker_Config.lua
 AscensionQuestTracker.lua
