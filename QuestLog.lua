@@ -2,19 +2,16 @@ local addonName, ns = ...
 local AQT = ns.AQT
 local ASSETS = ns.ASSETS or {}
 
--- POOLS
 local pooled_quests = {}
 local pooled_grouped = {}
 local pooled_zoneOrder = {}
 local pooled_watchedIDs = {}
 
--- UTILS
 local function GetColor(group, fallback)
     if ASSETS.colors and ASSETS.colors[group] then return ASSETS.colors[group] end
     return fallback or {r=1, g=1, b=1, a=1}
 end
 
--- EXPORTED: Logic for Auto-SuperTracking
 function AQT:GetBestQuestForSuperTracking()
     if #pooled_quests > 0 then
         local bestID, bestDist = nil, 999999
@@ -30,10 +27,9 @@ function AQT:GetBestQuestForSuperTracking()
 end
 
 function AQT:RenderQuests(startY, lineIdx, barIdx, itemIdx)
-    local shouldHide = AscensionQuestTrackerDB and AscensionQuestTrackerDB.hideOnBoss
+    local shouldHide = self.db.profile.hideOnBoss -- Ace3 DB
     if shouldHide and self.inBossCombat then return startY, lineIdx, barIdx, itemIdx end
 
-    -- CALCULATED DYNAMIC HEIGHTS
     local hHead = ASSETS.fontHeaderSize + (ASSETS.lineSpacing or 6)
     local hText = ASSETS.fontTextSize + (ASSETS.lineSpacing or 6)
     local hSub  = (ASSETS.fontTextSize - 1) + (ASSETS.lineSpacing or 6)
@@ -41,20 +37,17 @@ function AQT:RenderQuests(startY, lineIdx, barIdx, itemIdx)
     local yOffset = startY
     if not C_QuestLog or not C_QuestLog.GetNumQuestWatches then return yOffset, lineIdx, barIdx, itemIdx end
 
-    local width = (AscensionQuestTrackerDB and AscensionQuestTrackerDB.width) or 260
-    
-    ----------------------------------------------------------------------------
-    -- DATA GATHERING
-    ----------------------------------------------------------------------------
+    local width = self.db.profile.width or 260
+
+    -- DATA GATHERING (Sin cambios en lógica, solo estructura)
     local campaignQuests = {}
     local worldQuests = {}
-    local sideQuests = {} 
+    local sideQuests = {}
     local sideQuestsZoneOrder = {}
-    
-    table.wipe(pooled_watchedIDs)
-    table.wipe(pooled_quests) 
 
-    -- 1. Get Watched Quests
+    table.wipe(pooled_watchedIDs)
+    table.wipe(pooled_quests)
+
     if C_QuestLog.GetQuestIDForWatch then
         local numWatches = C_QuestLog.GetNumQuestWatches()
         for i = 1, numWatches do
@@ -63,7 +56,6 @@ function AQT:RenderQuests(startY, lineIdx, barIdx, itemIdx)
         end
     end
 
-    -- 2. Auto-Add Active World Quests
     local currentMapID = C_Map.GetBestMapForUnit("player")
     if currentMapID and C_TaskQuest and C_TaskQuest.GetQuestsOnMap then
         local tasks = C_TaskQuest.GetQuestsOnMap(currentMapID)
@@ -76,8 +68,7 @@ function AQT:RenderQuests(startY, lineIdx, barIdx, itemIdx)
             end
         end
     end
-    
-    -- 3. Safety Fallback
+
     if C_QuestLog.GetNumQuestLogEntries then
         for i = 1, C_QuestLog.GetNumQuestLogEntries() do
             local info = C_QuestLog.GetInfo(i)
@@ -94,11 +85,10 @@ function AQT:RenderQuests(startY, lineIdx, barIdx, itemIdx)
         end
     end
 
-    -- 4. Sort into Categories
     for _, qID in ipairs(pooled_watchedIDs) do
         local info = nil
         local logIdx = C_QuestLog.GetLogIndexForQuestID(qID)
-        
+
         if logIdx then
             info = C_QuestLog.GetInfo(logIdx)
         else
@@ -115,13 +105,13 @@ function AQT:RenderQuests(startY, lineIdx, barIdx, itemIdx)
         if info and (not info.isHidden or isWQ) then
             local isCampaign = info.campaignID and info.campaignID > 0
             local data = { id = qID, info = info, timeRem = 0 }
-            
+
             local distSq = C_QuestLog.GetDistanceSqToQuest(qID)
             data.distValue = (distSq and distSq >= 0) and distSq or 999999
             table.insert(pooled_quests, data)
-            
+
             if self.GetWorldQuestTimeRemaining then data.timeRem = self:GetWorldQuestTimeRemaining(qID) end
-            
+
             if isCampaign then
                 table.insert(campaignQuests, data)
             elseif isWQ then
@@ -137,53 +127,49 @@ function AQT:RenderQuests(startY, lineIdx, barIdx, itemIdx)
         end
     end
 
-    ----------------------------------------------------------------------------
     -- RENDER LOGIC
-    ----------------------------------------------------------------------------
-    
     local function RenderSection(headerTitle, headerIconAtlas, quests, isSubHeader)
         if #quests == 0 then return end
-        
-        -- [MODIFICADO] Header logic: Si headerTitle es nil, no se dibuja el texto.
+
         if headerTitle then
             local hLine = self:GetLine(lineIdx)
-            hLine:SetPoint("TOPRIGHT", self, "TOPRIGHT", -ASSETS.padding, yOffset)
-            
+            -- [FIX] Usar self.Content en lugar de self
+            hLine:SetPoint("TOPRIGHT", self.Content, "TOPRIGHT", -ASSETS.padding, yOffset)
+
             hLine.text:SetFont(ASSETS.font, ASSETS.fontHeaderSize, "OUTLINE")
             local cHead = GetColor("header", {r=1, g=1, b=1})
             hLine.text:SetTextColor(cHead.r, cHead.g, cHead.b)
-            
+
             if headerIconAtlas and hLine.icon then
                 hLine.icon:Show()
                 hLine.icon:SetAtlas(headerIconAtlas)
                 hLine.icon:SetSize(ASSETS.fontHeaderSize + 2, ASSETS.fontHeaderSize + 2)
             end
-            
+
             if isSubHeader then
                  local cZone = GetColor("zone", {r=1, g=0.8, b=0})
                  hLine.text:SetTextColor(cZone.r, cZone.g, cZone.b)
                  self.SafelySetText(hLine.text, "  " .. headerTitle)
-                 yOffset = yOffset - hHead 
+                 yOffset = yOffset - hHead
             else
                  self.SafelySetText(hLine.text, "  " .. string.upper(headerTitle))
                  if hLine.separator then hLine.separator:Show() end
-                 yOffset = yOffset - (hHead + 4) 
+                 yOffset = yOffset - (hHead + 4)
             end
-            
+
             hLine:Show()
             lineIdx = lineIdx + 1
         end
-        -- [FIN MODIFICACION]
-        
-        -- Quests
+
         for _, qData in ipairs(quests) do
             local qID = qData.id
             local info = qData.info
             local isComplete = C_QuestLog.IsComplete(qID)
-            
+
             local l = self:GetLine(lineIdx)
-            l:SetPoint("TOPRIGHT", self, "TOPRIGHT", -ASSETS.padding, yOffset)
-            
+            -- [FIX] Usar self.Content
+            l:SetPoint("TOPRIGHT", self.Content, "TOPRIGHT", -ASSETS.padding, yOffset)
+
             if l.icon then
                 l.icon:Show()
                 if isComplete then
@@ -196,23 +182,22 @@ function AQT:RenderQuests(startY, lineIdx, barIdx, itemIdx)
                     else l.icon:SetTexture("Interface\\Buttons\\UI-MicroButton-Quest-Up") end
                     l.icon:SetVertexColor(1, 1, 1)
                 end
-                l.icon:SetSize(ASSETS.fontTextSize + 4, ASSETS.fontTextSize + 4) 
+                l.icon:SetSize(ASSETS.fontTextSize + 4, ASSETS.fontTextSize + 4)
             end
-            
+
             local color = GetColor("quest", {r=1, g=1, b=1})
             if isComplete then color = GetColor("complete", {r=0, g=1, b=0}) end
-            
+
             l.text:SetTextColor(color.r, color.g, color.b)
             l.text:SetFont(ASSETS.font, ASSETS.fontTextSize, "OUTLINE")
-            
+
             local titleText = info.title
              if isComplete then titleText = titleText .. " |cff00ff00(Ready)|r" end
             self.SafelySetText(l.text, "  " .. titleText)
             l:Show()
-            
-            -- Interaction
+
             l:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-            l:SetScript("OnClick", function(self, button) 
+            l:SetScript("OnClick", function(self, button)
                 if button == "RightButton" then
                     if C_QuestLog.RemoveQuestWatch then
                         C_QuestLog.RemoveQuestWatch(qID)
@@ -233,34 +218,35 @@ function AQT:RenderQuests(startY, lineIdx, barIdx, itemIdx)
                 GameTooltip:Show()
             end)
             l:SetScript("OnLeave", function() GameTooltip:Hide() end)
-            
-            yOffset = yOffset - hText 
+
+            yOffset = yOffset - hText
             lineIdx = lineIdx + 1
-            
-            -- Objectives
+
             if not isComplete then
                 local objectives = C_QuestLog.GetQuestObjectives(qID)
                 for _, obj in ipairs(objectives or {}) do
                     if obj.text and not obj.finished then
                         local oLine = self:GetLine(lineIdx)
-                        oLine:SetPoint("TOPRIGHT", self, "TOPRIGHT", -ASSETS.padding, yOffset)
-                        
+                        -- [FIX] Usar self.Content
+                        oLine:SetPoint("TOPRIGHT", self.Content, "TOPRIGHT", -ASSETS.padding, yOffset)
+
                         if oLine.indentLine then
                             oLine.indentLine:Show()
                             oLine.indentLine:SetHeight(hSub)
                             oLine.indentLine:SetPoint("TOPLEFT", oLine, "TOPLEFT", 6, 0)
                         end
-                        
+
                         oLine.text:SetFont(ASSETS.font, ASSETS.fontTextSize - 1)
                         oLine.text:SetTextColor(0.7, 0.7, 0.7)
                         self.SafelySetText(oLine.text, "    " .. obj.text)
                         oLine:Show()
                         yOffset = yOffset - hSub
                         lineIdx = lineIdx + 1
-                        
+
                          if obj.numRequired and obj.numRequired > 0 then
                             local bar = self:GetBar(barIdx)
-                            bar:SetPoint("TOPRIGHT", self, "TOPRIGHT", -ASSETS.padding, yOffset)
+                            -- [FIX] Usar self.Content
+                            bar:SetPoint("TOPRIGHT", self.Content, "TOPRIGHT", -ASSETS.padding, yOffset)
                             bar:SetSize(width - 40, ASSETS.barHeight)
                             bar:SetValue(obj.numFulfilled / obj.numRequired)
                             local cSide = GetColor("sideQuest", {r=0, g=0.7, b=1})
@@ -272,41 +258,40 @@ function AQT:RenderQuests(startY, lineIdx, barIdx, itemIdx)
                     end
                 end
             end
-             -- Bonus Bar
+
             if self.RenderBonusObjectiveBar then
                  local newY, newL, newB, rendered = self:RenderBonusObjectiveBar(qID, lineIdx, barIdx, width, yOffset)
                  if rendered then
                       yOffset = newY; lineIdx = newL; barIdx = newB
                  end
             end
-            yOffset = yOffset - 2 
+            yOffset = yOffset - 2
         end
         yOffset = yOffset - (ASSETS.spacing or 10)
     end
 
-    -- 2. Render Categories
     local iconCamp = (ASSETS.icons and ASSETS.icons.campaign) or nil
     local iconWQ = (ASSETS.icons and ASSETS.icons.wq) or nil
-    
+
     RenderSection("Campaign", iconCamp, campaignQuests, false)
     RenderSection("World Quests", iconWQ, worldQuests, false)
-    
+
     if #sideQuestsZoneOrder > 0 then
-         local hLine = self:GetLine(lineIdx)
-         hLine:SetPoint("TOPRIGHT", self, "TOPRIGHT", -ASSETS.padding, yOffset)
-         hLine.text:SetFont(ASSETS.font, ASSETS.fontHeaderSize, "OUTLINE")
-         self.SafelySetText(hLine.text, "  SIDE QUESTS")
-         if hLine.separator then hLine.separator:Show() end
-         hLine:Show()
-         yOffset = yOffset - (hHead + 4)
-         lineIdx = lineIdx + 1
-         
-         for _, mapID in ipairs(sideQuestsZoneOrder) do
-              local mapInfo = C_Map.GetMapInfo(mapID)
-              -- [MODIFICADO] Enviamos nil si no hay nombre, en lugar de "Unknown Zone"
-              local zoneName = (mapInfo and mapInfo.name) 
-              RenderSection(zoneName, nil, sideQuests[mapID], true) 
-         end
+        local hLine = self:GetLine(lineIdx)
+        -- [FIX] Usar self.Content
+        hLine:SetPoint("TOPRIGHT", self.Content, "TOPRIGHT", -ASSETS.padding, yOffset)
+        hLine.text:SetFont(ASSETS.font, ASSETS.fontHeaderSize, "OUTLINE")
+        self.SafelySetText(hLine.text, "  SIDE QUESTS")
+        if hLine.separator then hLine.separator:Show() end
+        hLine:Show()
+        yOffset = yOffset - (hHead + 4)
+        lineIdx = lineIdx + 1
+
+        for _, mapID in ipairs(sideQuestsZoneOrder) do
+            local mapInfo = C_Map.GetMapInfo(mapID)
+            local zoneName = (mapInfo and mapInfo.name)
+            RenderSection(zoneName, nil, sideQuests[mapID], true)
+        end
     end
 
     return yOffset, lineIdx, barIdx, itemIdx

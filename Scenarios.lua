@@ -31,7 +31,7 @@ function AQT:RenderScenario(startY, lineIdx, barIdx)
         -- Header
         local header = self:GetLine(lineIdx)
         header.text:SetFont(ASSETS.font, ASSETS.fontHeaderSize + 2, "OUTLINE")
-        header:SetPoint("TOPRIGHT", self, "TOPRIGHT", -ASSETS.padding, yOffset)
+        header:SetPoint("TOPRIGHT", self.Content, "TOPRIGHT", -ASSETS.padding, yOffset)
         
         local hBg = GetColor("headerBg", {r=0, g=0, b=0, a=0.5})
         -- header:SetBackdropColor(hBg.r, hBg.g, hBg.b, hBg.a) -- Backdrop removed in Core.lua
@@ -54,7 +54,7 @@ function AQT:RenderScenario(startY, lineIdx, barIdx)
             if affixString ~= "" then
                 local affixLine = self:GetLine(lineIdx)
                 affixLine.text:SetFont(ASSETS.font, 10, "OUTLINE")
-                affixLine:SetPoint("TOPRIGHT", self, "TOPRIGHT", -ASSETS.padding, yOffset)
+                affixLine:SetPoint("TOPRIGHT", self.Content, "TOPRIGHT", -ASSETS.padding, yOffset)
                 self.SafelySetText(affixLine.text, affixString)
                 affixLine:Show()
                 yOffset = yOffset - 14
@@ -65,7 +65,7 @@ function AQT:RenderScenario(startY, lineIdx, barIdx)
         -- Timer Texto
         local timerLine = self:GetLine(lineIdx)
         timerLine.text:SetFont(ASSETS.font, 18, "OUTLINE")
-        timerLine:SetPoint("TOPRIGHT", self, "TOPRIGHT", -ASSETS.padding, yOffset)
+        timerLine:SetPoint("TOPRIGHT", self.Content, "TOPRIGHT", -ASSETS.padding, yOffset)
         self.SafelySetText(timerLine.text, self.FormatTime(timeRem))
         timerLine:Show()
         yOffset = yOffset - 22
@@ -73,9 +73,9 @@ function AQT:RenderScenario(startY, lineIdx, barIdx)
 
         -- Timer Barra
         local timeBar = self:GetBar(barIdx)
-        timeBar:SetPoint("TOPRIGHT", self, "TOPRIGHT", -ASSETS.padding, yOffset)
+        timeBar:SetPoint("TOPRIGHT", self.Content, "TOPRIGHT", -ASSETS.padding, yOffset)
         timeBar:SetStatusBarTexture(ASSETS.barTexture or "Interface\\Buttons\\WHITE8x8") -- Asegurar Textura
-        local width = (AscensionQuestTrackerDB and AscensionQuestTrackerDB.width) or 260
+        local width = (self.db and self.db.profile and self.db.profile.width) or 260
         timeBar:SetSize(width - 20, 6)
         timeBar:SetMinMaxValues(0, timeLimit or 1)
         timeBar:SetValue(timeLimit - timeRem)
@@ -112,7 +112,7 @@ function AQT:RenderScenario(startY, lineIdx, barIdx)
     -- 1. Título
     local stageLine = self:GetLine(lineIdx)
     stageLine.text:SetFont(ASSETS.font, ASSETS.fontHeaderSize, "OUTLINE")
-    stageLine:SetPoint("TOPRIGHT", self, "TOPRIGHT", -ASSETS.padding, yOffset)
+    stageLine:SetPoint("TOPRIGHT", self.Content, "TOPRIGHT", -ASSETS.padding, yOffset)
     local cHead = GetColor("header", {r=1, g=0.8, b=0})
     stageLine.text:SetTextColor(cHead.r, cHead.g, cHead.b)
     self.SafelySetText(stageLine.text, stageName)
@@ -124,7 +124,7 @@ function AQT:RenderScenario(startY, lineIdx, barIdx)
     if stageDesc and stageDesc ~= "" then
         local descLine = self:GetLine(lineIdx)
         descLine.text:SetFont(ASSETS.font, ASSETS.fontTextSize - 1)
-        descLine:SetPoint("TOPRIGHT", self, "TOPRIGHT", -ASSETS.padding, yOffset)
+        descLine:SetPoint("TOPRIGHT", self.Content, "TOPRIGHT", -ASSETS.padding, yOffset)
         descLine.text:SetTextColor(0.8, 0.8, 0.8)
         self.SafelySetText(descLine.text, stageDesc)
         descLine:Show()
@@ -150,7 +150,7 @@ function AQT:RenderScenario(startY, lineIdx, barIdx)
                 -- A. Texto
                 local line = self:GetLine(lineIdx)
                 line.text:SetFont(ASSETS.font, ASSETS.fontTextSize, "OUTLINE")
-                line:SetPoint("TOPRIGHT", self, "TOPRIGHT", -ASSETS.padding, yOffset)
+                line:SetPoint("TOPRIGHT", self.Content, "TOPRIGHT", -ASSETS.padding, yOffset)
                 line.text:SetTextColor(1, 1, 1)
 
                 local text = name
@@ -168,14 +168,11 @@ function AQT:RenderScenario(startY, lineIdx, barIdx)
                 -- B. Barra de Progreso
                 if totalQuantity and totalQuantity > 0 then
                     local bar = self:GetBar(barIdx)
-                    local width = (AscensionQuestTrackerDB and AscensionQuestTrackerDB.width) or 260
+                    local width = (self.db and self.db.profile and self.db.profile.width) or 260
                     
-                    bar:SetPoint("TOPRIGHT", self, "TOPRIGHT", -ASSETS.padding, yOffset)
+                    bar:SetPoint("TOPRIGHT", self.Content, "TOPRIGHT", -ASSETS.padding, yOffset)
                     bar:SetSize(width - 30, 8)
-                    
-                    -- ¡IMPORTANTE! Asegurar textura para que sea visible
                     bar:SetStatusBarTexture(ASSETS.barTexture or "Interface\\Buttons\\WHITE8x8")
-                    
                     bar:SetMinMaxValues(0, totalQuantity)
                     bar:SetValue(quantity)
                     
