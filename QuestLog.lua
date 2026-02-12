@@ -1,3 +1,15 @@
+-------------------------------------------------------------------------------
+-- Project: AscensionQuestTracker
+-- Author: Aka-DoctorCode 
+-- File: QuestLog.lua
+-- Version: 05
+-------------------------------------------------------------------------------
+-- Copyright (c) 2025–2026 Aka-DoctorCode. All Rights Reserved.
+--
+-- This software and its source code are the exclusive property of the author.
+-- No part of this file may be copied, modified, redistributed, or used in 
+-- derivative works without express written permission.
+-------------------------------------------------------------------------------
 local addonName, ns = ...
 local AQT = ns.AQT
 local ASSETS = ns.ASSETS or {}
@@ -191,24 +203,132 @@ function AQT:RenderQuests(startY, lineIdx, barIdx, itemIdx)
             l.text:SetTextColor(color.r, color.g, color.b)
             l.text:SetFont(ASSETS.font, ASSETS.fontTextSize, "OUTLINE")
 
+            -- 1. Determine Title Text
             local titleText = info.title
-             if isComplete then titleText = titleText .. " |cff00ff00(Ready)|r" end
+            if isComplete then titleText = titleText .. " |cff00ff00(Ready)|r" end
             self.SafelySetText(l.text, "  " .. titleText)
             l:Show()
 
+            -- 2. Quest Item Button Logic
+            -- Only render if not in combat (Secure frames cannot be moved/shown in combat)
+            if not InCombatLockdown() then
+                local itemLink, itemIcon, itemCount, showItemWhenComplete
+                
+                -- We need the log index to get item info
+                if logIdx then
+                    itemLink, itemIcon, itemCount, showItemWhenComplete = GetQuestLogSpecialItemInfo(logIdx)
+                end
+
+                if itemIcon and (not isComplete or showItemWhenComplete) then
+                    local iBtn = self:GetItemButton(itemIdx)
+                    
+                    -- Calculate position: to the left of the text, or to the right of the tracker? 
+                    -- Reborn style: Right aligned, shifting left based on text width
+                    local textWidth = l.text:GetStringWidth()
+                    -- Adjust "20" based on your padding preferences
+                    local basePointX = -ASSETS.padding - textWidth - 15 
+                    
+                    -- Position the button next to the title
+                    iBtn:ClearAllPoints()
+                    iBtn:SetPoint("RIGHT", l, "RIGHT", -textWidth - 10, 0)
+                    
+                    -- Visuals
+                    iBtn.icon:SetTexture(itemIcon)
+                    iBtn.icon:SetVertexColor(1, 1, 1)
+                    iBtn.count:SetText(itemCount and itemCount > 1 and itemCount or "")
+                    
+                    -- Secure Attributes (The Magic)
+                    -- Reset first to avoid taint issues
+                    iBtn:SetAttribute("type", nil)
+                    iBtn:SetAttribute("item", nil)
+                    iBtn:SetAttribute("questLogIndex", nil)
+
+                    iBtn.itemLink = itemLink -- Saved for Shift-Click hook
+                    iBtn:SetAttribute("type", "item")
+                    iBtn:SetAttribute("item", itemLink)
+                    iBtn:SetAttribute("questLogIndex", logIdx)
+                    
+                    -- Ensure it's above the background
+                    iBtn:SetFrameLevel(l:GetFrameLevel() + 5)
+                    iBtn:Show()
+                    
+                    itemIdx = itemIdx + 1
+                end
+            end
+
             l:RegisterForClicks("LeftButtonUp", "RightButtonUp")
             l:SetScript("OnClick", function(self, button)
-                if button == "RightButton" then
-                    if C_QuestLog.RemoveQuestWatch then
+                -- 1. Left Click: Open Map / Details
+                if button == "LeftButton" then
+                    if IsShiftKeyDown() then
+                        -- Chat Link
+                        local link = GetQuestLink(qID)
+                        if link then ChatEdit_InsertLink(link) end
+                    else
+                        -- Open Map
+                        if QuestMapFrame_OpenToQuestDetails then
+                            QuestMapFrame_OpenToQuestDetails(qID)
+                        else
+                            if C_AddOns.LoadAddOn then C_AddOns.LoadAddOn("Blizzard_QuestMap") end
+                            if QuestMapFrame_OpenToQuestDetails then QuestMapFrame_OpenToQuestDetails(qID) end
+                        end
+                    end
+                    
+                -- 2. Right Click: Context Menu
+                elseif button == "RightButton" then
+                    -- Detect Precise Type for Menu Options
+                    local isRealWQ = false
+                    if C_QuestLog.IsWorldQuest then isRealWQ = C_QuestLog.IsWorldQuest(qID) end
+                    
+                    local isBonus = false
+                    if not isRealWQ and GetTaskInfo then
+                        local isInArea = GetTaskInfo(qID)
+                        if isInArea then isBonus = true end
+                    end
+
+                    -- A. Bonus Objectives (No Menu, just return)
+                    if isBonus then return end
+
+                    -- B. Modern Context Menu (MenuUtil)
+                    if MenuUtil and MenuUtil.CreateContextMenu then
+                        MenuUtil.CreateContextMenu(UIParent, function(owner, rootDescription)
+                            rootDescription:CreateTitle(info.title)
+
+                            -- Option: Focus / SuperTrack
+                            rootDescription:CreateButton("Focus / SuperTrack", function() 
+                                C_SuperTrack.SetSuperTrackedQuestID(qID) 
+                            end)
+
+                            -- Option: Open Map
+                            rootDescription:CreateButton("Open Map", function() 
+                                QuestMapFrame_OpenToQuestDetails(qID) 
+                            end)
+
+                            -- Option: Share Quest
+                            if C_QuestLog.IsPushableQuest(qID) and IsInGroup() then
+                                rootDescription:CreateButton("Share", function() 
+                                    C_QuestLog.ShareQuest(qID) 
+                                end)
+                            end
+
+                            -- World Quests stop here (cannot abandon)
+                            if isRealWQ then return end
+
+                            -- Option: Abandon (Red Text)
+                            rootDescription:CreateButton("|cffff4444Abandon|r", function() 
+                                QuestMapFrame_AbandonQuest(qID) 
+                            end)
+
+                            -- Option: Stop Tracking
+                            rootDescription:CreateButton("Stop Tracking", function() 
+                                C_QuestLog.RemoveQuestWatch(qID) 
+                                if AQT.FullUpdate then AQT:FullUpdate() end
+                            end)
+                        end)
+                    else
+                        -- Fallback for older clients or if MenuUtil is missing
                         C_QuestLog.RemoveQuestWatch(qID)
                         if AQT.FullUpdate then AQT:FullUpdate() end
-                    end
-                else
-                    if QuestMapFrame_OpenToQuestDetails then
-                        QuestMapFrame_OpenToQuestDetails(qID)
-                    else
-                        if C_AddOns.LoadAddOn then C_AddOns.LoadAddOn("Blizzard_QuestMap") end
-                        if QuestMapFrame_OpenToQuestDetails then QuestMapFrame_OpenToQuestDetails(qID) end
                     end
                 end
             end)

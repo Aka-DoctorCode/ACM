@@ -1,3 +1,15 @@
+-------------------------------------------------------------------------------
+-- Project: AscensionQuestTracker
+-- Author: Aka-DoctorCode 
+-- File: Core.lua
+-- Version: 05
+-------------------------------------------------------------------------------
+-- Copyright (c) 2025–2026 Aka-DoctorCode. All Rights Reserved.
+--
+-- This software and its source code are the exclusive property of the author.
+-- No part of this file may be copied, modified, redistributed, or used in 
+-- derivative works without express written permission.
+-------------------------------------------------------------------------------
 local addonName, ns = ...
 -- Initialize AceAddon
 local AQT = LibStub("AceAddon-3.0"):NewAddon("AscensionQuestTracker", "AceEvent-3.0", "AceConsole-3.0")
@@ -33,7 +45,6 @@ function AQT:OnEnable()
     
     self:RegisterEvents()
     self:FullUpdate()
-    print("|cff00ff00Ascension Quest Tracker:|r v2.5 (Ace3) Loaded.")
 end
 
 --------------------------------------------------------------------------------
@@ -143,6 +154,49 @@ function AQT:GetBar(index)
     end
     if self.bars[index].bg then self.bars[index].bg:Show() end
     return self.bars[index]
+end
+
+-- Secure Item Button Pool
+function AQT:GetItemButton(index)
+    if not self.itemButtons[index] then
+        local name = "AQTItemButton" .. index
+        -- Create a SecureActionButton so it can trigger items/spells
+        local b = CreateFrame("Button", name, self.Container, "SecureActionButtonTemplate")
+        b:SetSize(22, 22)
+        b:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square")
+        
+        b.icon = b:CreateTexture(nil, "ARTWORK")
+        b.icon:SetAllPoints()
+        
+        b.count = b:CreateFontString(nil, "OVERLAY", "NumberFontNormalSmall")
+        b.count:SetPoint("BOTTOMRIGHT", b, "BOTTOMRIGHT", -1, 1)
+        
+        -- Click handlers: Use AnyUp/AnyDown for better responsiveness
+        b:RegisterForClicks("AnyUp", "AnyDown")
+        
+        -- Tooltip logic
+        b:SetScript("OnEnter", function(self)
+            local questLogIndex = self:GetAttribute("questLogIndex")
+            if questLogIndex then
+                GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+                GameTooltip:SetQuestLogSpecialItem(questLogIndex)
+                GameTooltip:Show()
+            end
+        end)
+        b:SetScript("OnLeave", function()
+            GameTooltip:Hide()
+        end)
+
+        -- Hook for Shift-Click Chat Link (Preserves SecureActionButton logic)
+        b:HookScript("OnClick", function(self)
+            if IsShiftKeyDown() and self.itemLink then
+                ChatEdit_InsertLink(self.itemLink)
+            end
+        end)
+        
+        self.itemButtons[index] = b
+    end
+    return self.itemButtons[index]
 end
 
 function AQT.SafelySetText(fontString, text)

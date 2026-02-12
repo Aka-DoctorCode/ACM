@@ -1,3 +1,15 @@
+-------------------------------------------------------------------------------
+-- Project: AscensionQuestTracker
+-- Author: Aka-DoctorCode 
+-- File: Config.lua
+-- Version: 05
+-------------------------------------------------------------------------------
+-- Copyright (c) 2025–2026 Aka-DoctorCode. All Rights Reserved.
+--
+-- This software and its source code are the exclusive property of the author.
+-- No part of this file may be copied, modified, redistributed, or used in 
+-- derivative works without express written permission.
+-------------------------------------------------------------------------------
 -- --------------------------------------------------------------------------------
 -- -- CONFIGURATION MODULE
 -- --------------------------------------------------------------------------------
@@ -365,10 +377,11 @@ end
 
 function AQT:SetupOptions()
     LibStub("AceConfig-3.0"):RegisterOptionsTable("AscensionQuestTracker", self:GetOptions())
-    self.optionsFrame = LibStub("AceConfigDialog-3.0"):AddToBlizOptions("AscensionQuestTracker", "Ascension Quest Tracker")
     
-    -- Chat Command
+    local optionsFrame, categoryID = LibStub("AceConfigDialog-3.0"):AddToBlizOptions("AscensionQuestTracker", "Ascension Quest Tracker")
+    self.optionsFrame = optionsFrame
+    
     self:RegisterChatCommand("aqt", function() 
-        Settings.OpenToCategory("Ascension Quest Tracker") -- Modern WoW API
+        Settings.OpenToCategory(categoryID) 
     end)
 end

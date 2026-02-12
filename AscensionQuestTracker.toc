@@ -2,13 +2,13 @@
 ## Title: Ascension Quest Tracker
 ## Notes: Minimalistic substitute for the default quest tracker.
 ## Author: AkaDoctorCode
-## Version: 04
+## Version: 05
 ## SavedVariables: AscensionQuestTrackerDB
 ## IconTexture: Interface\AddOns\AscensionNotes\Media\AkaDoctorCode.png
 
 # Libraries
 Libs\LibStub\LibStub.lua
-Libs\CallbackHandler-1.0\CallbackHandler-1.0.xml
+Libs\CallbackHandler-1.0\CallbackHandler-1.0\CallbackHandler-1.0.xml
 Libs\AceAddon-3.0\AceAddon-3.0.xml
 Libs\AceEvent-3.0\AceEvent-3.0.xml
 Libs\AceDB-3.0\AceDB-3.0.xml

@@ -9,7 +9,7 @@ ignore:
     - .pkgmeta
     - __MACOSX
     - .DS_Store
-    - .txt
+    - cambios.txt
 
 externals:
     Libs/LibStub: https://repos.curseforge.com/wow/libstub/trunk
