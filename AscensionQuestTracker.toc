@@ -2,7 +2,7 @@
 ## Title: Ascension Quest Tracker
 ## Notes: Minimalistic substitute for the default quest tracker.
 ## Author: AkaDoctorCode
-## Version: 05
+## Version: 07
 ## SavedVariables: AscensionQuestTrackerDB
 ## IconTexture: Interface\AddOns\AscensionNotes\Media\AkaDoctorCode.png
 

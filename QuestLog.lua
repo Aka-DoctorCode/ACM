@@ -2,213 +2,363 @@
 -- Project: AscensionQuestTracker
 -- Author: Aka-DoctorCode 
 -- File: QuestLog.lua
--- Version: 06
+-- Version: 07
+-------------------------------------------------------------------------------
+-- Copyright (c) 2025–2026 Aka-DoctorCode. All Rights Reserved.
+--
+-- This software and its source code are the exclusive property of the author.
+-- No part of this file may be copied, modified, redistributed, or used in 
+-- derivative works without express written permission.
 -------------------------------------------------------------------------------
 local addonName, ns = ...
 local AQT = ns.AQT
-local ASSETS = ns.ASSETS
+if not AQT then 
+    ns.AQT = {}
+    AQT = ns.AQT
+end
 
--- Reusable tables to reduce Garbage Collection
+-- MEMORY POOLING
+-- Reusable tables to reduce Garbage Collection churn
 local pooled_watchedIDs = {}
-local pooled_quests = {}
+local pooled_campaign = {}
+local pooled_grouped = {} -- Key: mapID, Value: Array of quest data
+local pooled_zoneOrder = {}
+local pooled_flatList = {}
 
 function AQT:RenderQuests(startY, lineIdx, barIdx, itemIdx, style)
-    local ASSETS = ns.ASSETS
-    -- 1. Apply Granular Style (or fallback)
+    local ASSETS = ns.ASSETS or AQT.ASSETS or {}
     local s = style or { headerSize = 13, textSize = 10, barHeight = 4, lineSpacing = 6 }
-    local font = ASSETS.font
     
-    -- Boss Hide Check
-    local shouldHide = self.db.profile.hideOnBoss
-    if shouldHide and self.inBossCombat then return startY, lineIdx, barIdx, itemIdx end
-
-    -- Pre-calculate heights
-    local hHead = s.headerSize + (s.lineSpacing or 6)
-    local hText = s.textSize + (s.lineSpacing or 6)
-    local hSub  = (s.textSize - 1) + (s.lineSpacing or 6)
-    local width = self.db.profile.width or 260
+    -- Secure Font Loading Logic
+    local font = ASSETS.font
+    if not font and GameFontNormal then
+        local fontPath, _, _ = GameFontNormal:GetFont()
+        font = fontPath
+    end
+    if not font or type(font) ~= "string" then font = "Fonts\\FRIZQT__.TTF" end    
+    
+    local db = self.db.profile
     local yOffset = startY
+    
+    -- Define variables needed by RenderSection
+    local hHead = (s.headerSize or s.titleSize or 13) + (s.lineSpacing or 6)
+    local width = db.width or 260
 
     if not C_QuestLog or not C_QuestLog.GetNumQuestWatches then return yOffset, lineIdx, barIdx, itemIdx end
 
-    -- 2. Data Gathering
-    local campaignQuests = {}
-    local sideQuests = {}
-    local sideQuestsZoneOrder = {}
-    
+    ----------------------------------------------------------------------------
+    -- 1. CLEANUP POOLS
+    ----------------------------------------------------------------------------
     table.wipe(pooled_watchedIDs)
-    table.wipe(pooled_quests)
+    table.wipe(pooled_campaign)
+    table.wipe(pooled_zoneOrder)
+    table.wipe(pooled_flatList)
+    
+    for k, v in pairs(pooled_grouped) do table.wipe(v) end
 
-    -- Gather Watched Quests
-    local numWatches = C_QuestLog.GetNumQuestWatches()
-    for i = 1, numWatches do
-        local id = C_QuestLog.GetQuestIDForQuestWatchIndex(i) 
-        if id then table.insert(pooled_watchedIDs, id) end
-    end
+    ----------------------------------------------------------------------------
+    -- 2. DATA GATHERING (EXCLUSIVE)
+    ----------------------------------------------------------------------------
+    if not db.testMode then
+        -- A. Gather Watched Quests
+        local numWatches = C_QuestLog.GetNumQuestWatches()
+        for i = 1, numWatches do
+            local id = C_QuestLog.GetQuestIDForQuestWatchIndex(i)
+            if id then pooled_watchedIDs[id] = true end
+        end
 
-    -- Gather Zone/Task Quests (Auto-add)
-    local currentMapID = C_Map.GetBestMapForUnit("player")
-    if currentMapID and C_TaskQuest and C_TaskQuest.GetQuestsOnMap then
-        local tasks = C_TaskQuest.GetQuestsOnMap(currentMapID)
-        if tasks then
-            for _, taskInfo in ipairs(tasks) do
-                local qID = taskInfo.questID
-                -- Check for duplicates
-                local exists = false
-                for _, v in ipairs(pooled_watchedIDs) do if v == qID then exists = true; break end end
-                if not exists then table.insert(pooled_watchedIDs, qID) end
+        -- B. Force Tracked Quests
+        if self.ForceTrackedQuests then
+            for qID, _ in pairs(self.ForceTrackedQuests) do
+                if C_QuestLog.IsOnQuest(qID) then pooled_watchedIDs[qID] = true end
             end
         end
-    end
-
-    -- 3. Process Quests
-    for _, qID in ipairs(pooled_watchedIDs) do
-        -- Skip if it's a World Quest (Handled by WorldQuests.lua now)
-        local isWQ = false
-        if C_QuestLog.IsWorldQuest then isWQ = C_QuestLog.IsWorldQuest(qID) end
         
-        if not isWQ then
-            local info = nil
-            local logIdx = C_QuestLog.GetLogIndexForQuestID(qID)
-    
-            if logIdx then
-                info = C_QuestLog.GetInfo(logIdx)
-            else
-                -- Fallback if not in log (e.g. Bonus Objectives sometimes)
-                local title = C_QuestLog.GetTitleForQuestID(qID)
-                if title and title ~= "" then
-                    info = { title = title, questID = qID, isHeader = false, isHidden = false, campaignID = 0, mapID = 0 }
-                    if C_TaskQuest and C_TaskQuest.GetQuestZoneID then info.mapID = C_TaskQuest.GetQuestZoneID(qID) or 0 end
+        -- C. Include Super Tracked Quest (Focus)
+        -- This ensures the focused quest is always visible even if not "watched"
+        local superID = (C_SuperTrack and C_SuperTrack.GetSuperTrackedQuestID and C_SuperTrack.GetSuperTrackedQuestID()) or 0
+        if superID > 0 and C_QuestLog.IsOnQuest(superID) then
+            pooled_watchedIDs[superID] = true
+        end
+
+        -- D. Auto-Add Zone Tasks
+        local currentMapID = C_Map.GetBestMapForUnit("player")
+        if currentMapID and C_TaskQuest and C_TaskQuest.GetQuestsOnMap then
+            local tasks = C_TaskQuest.GetQuestsOnMap(currentMapID)
+            if tasks then
+                for _, taskInfo in ipairs(tasks) do
+                    pooled_watchedIDs[taskInfo.questID] = true
                 end
             end
-    
-            if info and not info.isHidden then
-                local isCampaign = info.campaignID and info.campaignID > 0
-                local data = { id = qID, info = info, logIdx = logIdx }
-    
-                if isCampaign then
-                    table.insert(campaignQuests, data)
-                else
-                    local mapID = info.mapID or 0
-                    if not sideQuests[mapID] then
-                        sideQuests[mapID] = {}
-                        table.insert(sideQuestsZoneOrder, mapID)
-                    end
-                    table.insert(sideQuests[mapID], data)
+        end
+
+        -- PROCESS REAL DATA
+        for qID, _ in pairs(pooled_watchedIDs) do
+            -- Skip WQs (Handled by WorldQuests module)
+            local isWQ = C_QuestLog.IsWorldQuest and C_QuestLog.IsWorldQuest(qID)
+            
+            if not isWQ then
+                local info = nil
+                local logIdx = C_QuestLog.GetLogIndexForQuestID(qID)
+                
+                if logIdx then info = C_QuestLog.GetInfo(logIdx)
+                else 
+                    local title = C_QuestLog.GetTitleForQuestID(qID)
+                    if title then info = { title = title, questID = qID, isHidden = false, campaignID = 0, mapID = 0 } end
                 end
+        
+                if info and not info.isHidden then
+                    -- Distance Calculation
+                    local distSq = C_QuestLog.GetDistanceSqToQuest(qID)
+                    local distance = distSq and math.sqrt(distSq) or 99999
+                    
+                    local data = { id = qID, info = info, logIdx = logIdx, distance = distance }
+        
+                    if info.campaignID and info.campaignID > 0 then
+                        table.insert(pooled_campaign, data)
+                    else
+                        if db.showAllZoneHeaders then
+                            -- Group by Zone
+                            local mapID = info.mapID or 0
+                            if not pooled_grouped[mapID] then
+                                pooled_grouped[mapID] = {}
+                                table.insert(pooled_zoneOrder, mapID)
+                            elseif #pooled_grouped[mapID] == 0 then
+                                local found = false
+                                for _, m in ipairs(pooled_zoneOrder) do if m == mapID then found = true break end end
+                                if not found then table.insert(pooled_zoneOrder, mapID) end
+                            end
+                            table.insert(pooled_grouped[mapID], data)
+                        else
+                            -- Flat List
+                            table.insert(pooled_flatList, data)
+                        end
+                    end
+                end
+            end
+        end
+
+    else
+        ----------------------------------------------------------------------------
+        -- 3. TEST MODE INJECTION (EXCLUSIVE)
+        ----------------------------------------------------------------------------
+        local fakeQuests = {
+            { id = 999901, title = "Test Campaign: Assault on Citadel", isCampaign = true, mapID = 0, dist = 50 },
+            { id = 999902, title = "Test Quest: Collect 10 Apples", isCampaign = false, mapID = 2022, dist = 150 }, -- 2022 = Waking Shores
+            { id = 999903, title = "Test Quest: Slay the Dragon", isCampaign = false, mapID = 2022, dist = 500 },
+            { id = 999904, title = "Test Side Quest: Lost Item", isCampaign = false, mapID = 2023, dist = 1200 }, -- 2023 = Ohn'ahran Plains
+        }
+        
+        for _, fq in ipairs(fakeQuests) do
+            local info = {
+                title = fq.title,
+                questID = fq.id,
+                campaignID = fq.isCampaign and 1 or 0,
+                mapID = fq.mapID,
+                isHidden = false
+            }
+            local data = { id = fq.id, info = info, logIdx = nil, distance = fq.dist, isTest = true }
+
+            if fq.isCampaign then
+                table.insert(pooled_campaign, data)
+            elseif db.showAllZoneHeaders then
+                local mapID = fq.mapID
+                if not pooled_grouped[mapID] then
+                    pooled_grouped[mapID] = {}
+                    table.insert(pooled_zoneOrder, mapID)
+                end
+                table.insert(pooled_grouped[mapID], data)
+            else
+                table.insert(pooled_flatList, data)
             end
         end
     end
 
-    -- 4. Render Function
-    local function RenderSection(headerTitle, headerIconAtlas, quests, isSubHeader)
+    -- Sorting Function
+    local function DistanceSort(a, b) return a.distance < b.distance end
+
+    table.sort(pooled_campaign, DistanceSort)
+    
+    if db.showAllZoneHeaders then
+        for _, mapID in ipairs(pooled_zoneOrder) do
+            table.sort(pooled_grouped[mapID], DistanceSort)
+        end
+    else
+        table.sort(pooled_flatList, DistanceSort)
+    end
+
+    ----------------------------------------------------------------------------
+    -- 4. RENDERING
+    ----------------------------------------------------------------------------
+    local function RenderSection(headerTitle, quests, isSubHeader)
         if #quests == 0 then return end
 
         -- Header
         if headerTitle then
             local hLine = self:GetLine(lineIdx)
+            hLine:ClearAllPoints()
             hLine:SetPoint("TOPRIGHT", self.Content, "TOPRIGHT", -ASSETS.padding, yOffset)
-
-            hLine.text:SetFont(font, s.headerSize, "OUTLINE")
+            
+            -- Font & Color
+            hLine.text:SetFont(font, s.headerSize or 14, "OUTLINE")
             
             if isSubHeader then
-                 -- Zone Name (Yellow/Gold)
-                 local cZone = ASSETS.colors.zone or {r=1, g=0.8, b=0}
-                 hLine.text:SetTextColor(cZone.r, cZone.g, cZone.b)
-                 self.SafelySetText(hLine.text, "  " .. headerTitle)
-                 yOffset = yOffset - hHead
+                local c = ASSETS.colors.zone or {r=1, g=0.8, b=0}
+                hLine.text:SetTextColor(c.r, c.g, c.b)
+                yOffset = yOffset - hHead
             else
-                 -- Main Header (Campaign/Quests)
-                 local cHead = ASSETS.colors.header or {r=1, g=1, b=1}
-                 hLine.text:SetTextColor(cHead.r, cHead.g, cHead.b)
-                 self.SafelySetText(hLine.text, "  " .. string.upper(headerTitle))
-                 if hLine.separator then hLine.separator:Show() end
-                 yOffset = yOffset - (hHead + 4)
+                local c = ASSETS.colors.header or {r=1, g=1, b=1}
+                hLine.text:SetTextColor(c.r, c.g, c.b)
+                yOffset = yOffset - (hHead + 4)
             end
-
-            hLine:Show()
-            lineIdx = lineIdx + 1
+            
+            -- Collapse Logic & Text
+            local isCollapsed = self.db.profile.collapsed[headerTitle]
+            -- FIX: Removed string.upper() to keep natural capitalization
+            local displayTitle = headerTitle 
+            local prefix = isCollapsed and "(+) " or "(-) "
+            
+            self.SafelySetText(hLine.text, prefix .. displayTitle)
+            
+            hLine:EnableMouse(true)
+            hLine:RegisterForClicks("LeftButtonUp")
+            hLine:SetScript("OnClick", function()
+                self.db.profile.collapsed[headerTitle] = not self.db.profile.collapsed[headerTitle]
+                self:FullUpdate()
+            end)
+            
+            hLine:Show(); lineIdx = lineIdx + 1
+            if isCollapsed then return end
         end
 
-        -- Quests
         for _, qData in ipairs(quests) do
             local qID = qData.id
             local info = qData.info
-            local logIdx = qData.logIdx
-            local isComplete = C_QuestLog.IsComplete(qID)
+            local dist = qData.distance
+            local isComplete = false
+            if not qData.isTest then
+                isComplete = C_QuestLog.IsComplete(qID)
+            end
+            local isCampaign = info.campaignID and info.campaignID > 0
+            
+            -- Check Super Track
+            local superID = (C_SuperTrack and C_SuperTrack.GetSuperTrackedQuestID and C_SuperTrack.GetSuperTrackedQuestID()) or 0
+            local isSuperTracked = (qID == superID)
 
             local l = self:GetLine(lineIdx)
             l:SetPoint("TOPRIGHT", self.Content, "TOPRIGHT", -ASSETS.padding, yOffset)
 
-            -- Icon
+            -- Icon (Minimalistic Toggle Circle)
             if l.icon then
                 l.icon:Show()
-                if isComplete then
-                    l.icon:SetTexture("Interface\\RaidFrame\\ReadyCheck-Ready")
-                    l.icon:SetVertexColor(0.2, 1, 0.2)
-                else
-                    l.icon:SetTexture("Interface\\Buttons\\UI-MicroButton-Quest-Up")
-                    l.icon:SetVertexColor(1, 1, 1)
+                local iconTexture = "Interface\\Buttons\\UI-RadioButton-UnCheck"
+                if isSuperTracked then
+                    iconTexture = "Interface\\Buttons\\UI-RadioButton-Check"
                 end
-                l.icon:SetSize(s.textSize + 2, s.textSize + 2)
+                l.icon:SetTexture(iconTexture)
+
+                -- Color Logic (Status Indicators)
+                if isComplete then
+                    l.icon:SetVertexColor(0, 1, 0) -- Green for Ready
+                elseif isCampaign then
+                    l.icon:SetVertexColor(0.2, 0.8, 1) -- Light Blue for Campaign
+                elseif isSuperTracked then
+                    l.icon:SetVertexColor(1, 0.8, 0) -- Gold for Active Focus
+                else
+                    l.icon:SetVertexColor(0.5, 0.5, 0.5) -- Grey for Standard
+                end
+                
+                -- Adjust size for the radio button texture
+                l.icon:SetSize((s.titleSize or 14), (s.titleSize or 14))
             end
 
-            -- Color
+            -- Color Selection
             local color = ASSETS.colors.quest or {r=1, g=1, b=1}
-            if isComplete then color = ASSETS.colors.complete or {r=0, g=1, b=0} end
-            l.text:SetTextColor(color.r, color.g, color.b)
-            l.text:SetFont(font, s.textSize, "OUTLINE")
+            
+            -- Module Override (if defined and not nil)
+            if s.titleColor and s.titleColor.r then 
+                color = s.titleColor 
+            end
+            
+            if isCampaign then 
+                color = ASSETS.colors.campaign or color 
+            end
+            
+            if isComplete then 
+                color = ASSETS.colors.complete or {r=0, g=1, b=0} 
+            end
+            
+            if isSuperTracked and self.db.profile.focused.titleColor then
+                color = self.db.profile.focused.titleColor
+            end
 
-            -- Title
+            l.text:SetTextColor(color.r, color.g, color.b)
+            l.text:SetFont(font, math.max(8, s.titleSize or 14), "OUTLINE")
+
+            -- Title + Yardage
             local titleText = info.title
+            if dist and dist < 1000 then
+                titleText = string.format("|cffaaaaaa[%dyd]|r %s", math.floor(dist), titleText)
+            end
             if isComplete then titleText = titleText .. " |cff00ff00(Ready)|r" end
+            
             self.SafelySetText(l.text, "  " .. titleText)
             l:Show()
 
-            -- Item Button Logic
-            if not InCombatLockdown() then
+            -- Item Button
+            if not InCombatLockdown() and not qData.isTest then
                 local itemLink, itemIcon, itemCount, showItemWhenComplete
-                if logIdx then
-                    itemLink, itemIcon, itemCount, showItemWhenComplete = GetQuestLogSpecialItemInfo(logIdx)
+                if qData.logIdx and C_QuestLog.GetQuestLogSpecialItemInfo then
+                    itemLink, itemIcon, itemCount, showItemWhenComplete = C_QuestLog.GetQuestLogSpecialItemInfo(qData.logIdx)
                 end
 
                 if itemIcon and (not isComplete or showItemWhenComplete) then
                     local iBtn = self:GetItemButton(itemIdx)
                     local textWidth = l.text:GetStringWidth()
-                    
                     iBtn:ClearAllPoints()
-                    -- Position right of the text
                     iBtn:SetPoint("RIGHT", l, "RIGHT", -textWidth - 10, 0)
-
                     iBtn.icon:SetTexture(itemIcon)
-                    iBtn.icon:SetVertexColor(1, 1, 1)
                     iBtn.count:SetText(itemCount and itemCount > 1 and itemCount or "")
-
+                    
                     -- Secure Attributes
                     iBtn:SetAttribute("type", nil) 
                     iBtn.itemLink = itemLink
                     iBtn:SetAttribute("type", "item")
                     iBtn:SetAttribute("item", itemLink)
-                    iBtn:SetAttribute("questLogIndex", logIdx)
-
+                    iBtn:SetAttribute("questLogIndex", qData.logIdx)
+                    
                     iBtn:SetFrameLevel(l:GetFrameLevel() + 5)
                     iBtn:Show()
                     itemIdx = itemIdx + 1
                 end
             end
 
-            -- Click Logic (Map / Context Menu)
+            -- Interaction (Safe Tooltips & Modern Context Menu)
             l:RegisterForClicks("LeftButtonUp", "RightButtonUp")
             l:SetScript("OnClick", function(self, button)
+                if qData.isTest then return end -- No interaction for test quests
+
                 if button == "LeftButton" then
                     if IsShiftKeyDown() then
-                        local link = GetQuestLink(qID)
+                        local link = C_QuestLog.GetQuestLink(qID)
                         if link then ChatEdit_InsertLink(link) end
                     else
-                        if QuestMapFrame_OpenToQuestDetails then QuestMapFrame_OpenToQuestDetails(qID) end
+                        if QuestMapFrame_OpenToQuestDetails then 
+                            QuestMapFrame_OpenToQuestDetails(qID) 
+                        elseif C_QuestLog.OpenQuestLog then
+                            C_QuestLog.OpenQuestLog(qID)
+                        end
                     end
+                elseif button == "LeftButton" and IsAltKeyDown() then
+                    -- Toggle Focus/SuperTrack functionality
+                    if isSuperTracked then
+                        C_SuperTrack.ClearAllSuperTracked()
+                    else
+                        C_SuperTrack.SetSuperTrackedQuestID(qID)
+                    end
+                    AQT:FullUpdate() -- Force visual update immediately
                 elseif button == "RightButton" then
-                     if MenuUtil and MenuUtil.CreateContextMenu then
+                    if MenuUtil and MenuUtil.CreateContextMenu then
                         MenuUtil.CreateContextMenu(UIParent, function(owner, rootDescription)
                             rootDescription:CreateTitle(info.title)
                             rootDescription:CreateButton("Focus / SuperTrack", function() C_SuperTrack.SetSuperTrackedQuestID(qID) end)
@@ -223,38 +373,61 @@ function AQT:RenderQuests(startY, lineIdx, barIdx, itemIdx, style)
                             end)
                         end)
                     else
+                        -- Legacy Fallback
                         C_QuestLog.RemoveQuestWatch(qID)
                         if AQT.FullUpdate then AQT:FullUpdate() end
                     end
                 end
             end)
             
-            yOffset = yOffset - hText
+            l:SetScript("OnEnter", function(self)
+                if qData.isTest then return end
+                AQT:SafeCall(function()
+                    GameTooltip:SetOwner(self, "ANCHOR_LEFT")
+                    GameTooltip:SetText(info.title)
+                    GameTooltip:Show()
+                end)
+            end)
+            l:SetScript("OnLeave", function() GameTooltip:Hide() end)
+            
+            yOffset = yOffset - (s.titleSize or 14) - 2
             lineIdx = lineIdx + 1
 
             -- Objectives
             if not isComplete then
-                local objectives = C_QuestLog.GetQuestObjectives(qID)
+                local objectives
+                if qData.isTest then
+                    objectives = {
+                        { text = "Test Objective: 5/10", numRequired = 10, numFulfilled = 5, finished = false },
+                        { text = "Test Completed Obj", numRequired = 1, numFulfilled = 1, finished = true }
+                    }
+                else
+                    objectives = C_QuestLog.GetQuestObjectives(qID)
+                end
+
                 if objectives then
                     for _, obj in ipairs(objectives) do
                         if obj.text and not obj.finished then
                             local oLine = self:GetLine(lineIdx)
                             oLine:SetPoint("TOPRIGHT", self.Content, "TOPRIGHT", -ASSETS.padding, yOffset)
-
-                            oLine.text:SetFont(font, s.textSize - 1)
+                            oLine.text:SetFont(font, s.objSize or 10)
                             oLine.text:SetTextColor(0.7, 0.7, 0.7)
                             self.SafelySetText(oLine.text, "    " .. obj.text)
                             oLine:Show()
-                            yOffset = yOffset - hSub
+                            yOffset = yOffset - (s.objSize or 10) - 2
                             lineIdx = lineIdx + 1
-
-                             if obj.numRequired and obj.numRequired > 0 then
+                            if obj.numRequired and obj.numRequired > 0 then
                                 local bar = self:GetBar(barIdx)
                                 bar:SetPoint("TOPRIGHT", self.Content, "TOPRIGHT", -ASSETS.padding, yOffset)
                                 bar:SetSize(width - 40, s.barHeight)
                                 bar:SetValue(obj.numFulfilled / obj.numRequired)
-                                local cSide = ASSETS.colors.sideQuest or {r=0, g=0.7, b=1}
-                                bar:SetStatusBarColor(cSide.r, cSide.g, cSide.b)
+                                
+                                -- Bar Color Logic
+                                local barC = ASSETS.colors.sideQuest or {r=0, g=0.7, b=1}
+                                if s.barColor and s.barColor.r then barC = s.barColor end
+                                if isSuperTracked and self.db.profile.focused.barColor then barC = self.db.profile.focused.barColor end
+                                
+                                bar:SetStatusBarColor(barC.r, barC.g, barC.b)
                                 bar:Show()
                                 yOffset = yOffset - (s.barHeight + 4)
                                 barIdx = barIdx + 1
@@ -263,29 +436,23 @@ function AQT:RenderQuests(startY, lineIdx, barIdx, itemIdx, style)
                     end
                 end
             end
-            
             yOffset = yOffset - 2
         end
         yOffset = yOffset - (s.lineSpacing or 6)
     end
 
-    -- 5. Final Render Calls
-    RenderSection("Campaign", nil, campaignQuests, false)
+    -- 5. FINAL RENDER CALLS
+    RenderSection("Campaign", pooled_campaign, false)
 
-    if #sideQuestsZoneOrder > 0 then
-        local hLine = self:GetLine(lineIdx)
-        hLine:SetPoint("TOPRIGHT", self.Content, "TOPRIGHT", -ASSETS.padding, yOffset)
-        hLine.text:SetFont(font, s.headerSize, "OUTLINE")
-        hLine.text:SetTextColor(1, 1, 1)
-        self.SafelySetText(hLine.text, "  QUESTS") -- Generic Header
-        hLine:Show()
-        yOffset = yOffset - (hHead + 4)
-        lineIdx = lineIdx + 1
-
-        for _, mapID in ipairs(sideQuestsZoneOrder) do
+    if db.showAllZoneHeaders then
+        for _, mapID in ipairs(pooled_zoneOrder) do
             local mapInfo = C_Map.GetMapInfo(mapID)
-            local zoneName = (mapInfo and mapInfo.name) or "Unknown Zone"
-            RenderSection(zoneName, nil, sideQuests[mapID], true)
+            local zoneName = (mapInfo and mapInfo.name) or "Test Zone"
+            RenderSection(zoneName, pooled_grouped[mapID], true)
+        end
+    else
+        if #pooled_flatList > 0 then
+            RenderSection("Quests", pooled_flatList, false)
         end
     end
 

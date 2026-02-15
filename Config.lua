@@ -2,7 +2,7 @@
 -- Project: AscensionQuestTracker
 -- Author: Aka-DoctorCode 
 -- File: Config.lua
--- Version: 06
+-- Version: 07
 -------------------------------------------------------------------------------
 -- Copyright (c) 2025–2026 Aka-DoctorCode. All Rights Reserved.
 --
@@ -10,222 +10,10 @@
 -- No part of this file may be copied, modified, redistributed, or used in 
 -- derivative works without express written permission.
 -------------------------------------------------------------------------------
--- --------------------------------------------------------------------------------
--- -- CONFIGURATION MODULE
--- --------------------------------------------------------------------------------
--- local addonName, addonTable = ...
-
--- -- 1. Default Settings
--- local defaults = {
---     position = { point = "RIGHT", relativePoint = "RIGHT", x = -50, y = 0 },
---     scale = 1.0,
---     hideOnBoss = true,
---     autoSuperTrack = false,
---     locked = false,
---     maxHeight = 600,
---     width = 260,
---     fontHeaderSize = 13,
---     fontTextSize = 10,
---     lineSpacing = 6,
---     sectionSpacing = 15
--- }
-
--- -- 2. Database Handling (SavedVariables)
--- function addonTable.LoadDatabase()
---     -- Create DB if it doesn't exist
---     if not AscensionQuestTrackerDB then
---         AscensionQuestTrackerDB = {}
---     end
-    
---     -- Populate missing defaults
---     for key, value in pairs(defaults) do
---         if AscensionQuestTrackerDB[key] == nil then
---             AscensionQuestTrackerDB[key] = value
---         end
---     end
-    
---     -- Deep copy for position if missing
---     if not AscensionQuestTrackerDB.position then
---         AscensionQuestTrackerDB.position = defaults.position
---     end
--- end
-
--- -- 3. Create Options Panel
--- local function CreateOptionsPanel()
---     local panel = CreateFrame("Frame", "AscensionQT_OptionsPanel", UIParent)
---     panel.name = "Ascension Quest Tracker"
-    
---     -- Title
---     local title = panel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
---     title:SetPoint("TOPLEFT", 16, -16)
---     title:SetText("Ascension Quest Tracker Settings")
-    
---     -- CHECKBOX: Hide on Boss
---     local cbHide = CreateFrame("CheckButton", nil, panel, "InterfaceOptionsCheckButtonTemplate")
---     cbHide:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -20)
---     cbHide.Text:SetText("Hide Quests during Boss Encounters")
---     cbHide:SetChecked(AscensionQuestTrackerDB.hideOnBoss)
---     cbHide:SetScript("OnClick", function(self)
---         AscensionQuestTrackerDB.hideOnBoss = self:GetChecked()
---         -- Trigger update in main addon
---         if AscensionQuestTrackerFrame and AscensionQuestTrackerFrame.FullUpdate then
---             AscensionQuestTrackerFrame:FullUpdate()
---         end
---     end)
-    
---     -- CHECKBOX: Lock Tracker
---     local cbLock = CreateFrame("CheckButton", nil, panel, "InterfaceOptionsCheckButtonTemplate")
---     cbLock:SetPoint("TOPLEFT", cbHide, "BOTTOMLEFT", 0, -10)
---     cbLock.Text:SetText("Lock Position")
---     cbLock:SetChecked(AscensionQuestTrackerDB.locked)
---     cbLock:SetScript("OnClick", function(self)
---         AscensionQuestTrackerDB.locked = self:GetChecked()
---         if AscensionQuestTrackerFrame then
---             AscensionQuestTrackerFrame:EnableMouse(not AscensionQuestTrackerDB.locked)
---         end
---     end)
-
---     -- CHECKBOX: Auto Super Track
---     local cbAutoTrack = CreateFrame("CheckButton", nil, panel, "InterfaceOptionsCheckButtonTemplate")
---     cbAutoTrack:SetPoint("TOPLEFT", cbLock, "BOTTOMLEFT", 0, -10)
---     cbAutoTrack.Text:SetText("Auto-Select Closest Quest (If none tracked)")
---     cbAutoTrack:SetChecked(AscensionQuestTrackerDB.autoSuperTrack)
---     cbAutoTrack:SetScript("OnClick", function(self)
---         AscensionQuestTrackerDB.autoSuperTrack = self:GetChecked()
---     end)
-
---     -- SLIDER: Scale
---     local sliderHeight = CreateFrame("Slider", "AscensionQT_HeightSlider", panel, "OptionsSliderTemplate")
---     sliderHeight:SetPoint("TOPLEFT", sliderScale, "BOTTOMLEFT", 0, -30)
---     sliderHeight:SetMinMaxValues(200, 1500)
---     sliderHeight:SetValue(AscensionQuestTrackerDB.maxHeight or 600)
---     sliderHeight:SetValueStep(10)
---     sliderHeight:SetObeyStepOnDrag(true)
-
---     _G[sliderHeight:GetName() .. "Low"]:SetText("200")
---     _G[sliderHeight:GetName() .. "High"]:SetText("1500")
---     _G[sliderHeight:GetName() .. "Text"]:SetText("Max Height: " .. (AscensionQuestTrackerDB.maxHeight or 600))
-
---     sliderHeight:SetScript("OnValueChanged", function(self, value)
---         local val = math.floor(value)
---         AscensionQuestTrackerDB.maxHeight = val
---         _G[self:GetName() .. "Text"]:SetText("Max Height: " .. val)
-        
---         if AscensionQuestTrackerFrame and AscensionQuestTrackerFrame.FullUpdate then
---             AscensionQuestTrackerFrame:FullUpdate()
---         end
---     end)
-
---     -- 1. SLIDER: Frame Width
---     local sliderWidth = CreateFrame("Slider", "AscensionQT_WidthSlider", panel, "OptionsSliderTemplate")
---     sliderWidth:SetPoint("TOPLEFT", sliderHeight, "BOTTOMLEFT", 0, -30)
---     sliderWidth:SetMinMaxValues(200, 600)
---     sliderWidth:SetValue(AscensionQuestTrackerDB.width or 260)
---     sliderWidth:SetValueStep(10)
---     sliderWidth:SetObeyStepOnDrag(true)
---     _G[sliderWidth:GetName() .. "Low"]:SetText("200")
---     _G[sliderWidth:GetName() .. "High"]:SetText("600")
---     _G[sliderWidth:GetName() .. "Text"]:SetText("Tracker Width: " .. (AscensionQuestTrackerDB.width or 260))
---     sliderWidth:SetScript("OnValueChanged", function(self, value)
---         local val = math.floor(value)
---         AscensionQuestTrackerDB.width = val
---         _G[self:GetName() .. "Text"]:SetText("Tracker Width: " .. val)
---         if AscensionQuestTrackerFrame and AscensionQuestTrackerFrame.FullUpdate then AscensionQuestTrackerFrame:FullUpdate() end
---     end)
-
---     -- 2. SLIDER: Header Font Size
---     local sliderHFont = CreateFrame("Slider", "AscensionQT_HFontSlider", panel, "OptionsSliderTemplate")
---     sliderHFont:SetPoint("TOPLEFT", sliderWidth, "BOTTOMLEFT", 0, -30)
---     sliderHFont:SetMinMaxValues(10, 30)
---     sliderHFont:SetValue(AscensionQuestTrackerDB.fontHeaderSize or 13)
---     sliderHFont:SetValueStep(1)
---     sliderHFont:SetObeyStepOnDrag(true)
---     _G[sliderHFont:GetName() .. "Low"]:SetText("10")
---     _G[sliderHFont:GetName() .. "High"]:SetText("30")
---     _G[sliderHFont:GetName() .. "Text"]:SetText("Header Font Size: " .. (AscensionQuestTrackerDB.fontHeaderSize or 13))
---     sliderHFont:SetScript("OnValueChanged", function(self, value)
---         local val = math.floor(value)
---         AscensionQuestTrackerDB.fontHeaderSize = val
---         _G[self:GetName() .. "Text"]:SetText("Header Font Size: " .. val)
---         if AscensionQuestTrackerFrame and AscensionQuestTrackerFrame.FullUpdate then AscensionQuestTrackerFrame:FullUpdate() end
---     end)
-
---     -- 3. SLIDER: Text Font Size
---     local sliderTFont = CreateFrame("Slider", "AscensionQT_TFontSlider", panel, "OptionsSliderTemplate")
---     sliderTFont:SetPoint("LEFT", sliderHFont, "RIGHT", 40, 0) -- Side by side
---     sliderTFont:SetMinMaxValues(8, 24)
---     sliderTFont:SetValue(AscensionQuestTrackerDB.fontTextSize or 10)
---     sliderTFont:SetValueStep(1)
---     sliderTFont:SetObeyStepOnDrag(true)
---     _G[sliderTFont:GetName() .. "Low"]:SetText("8")
---     _G[sliderTFont:GetName() .. "High"]:SetText("24")
---     _G[sliderTFont:GetName() .. "Text"]:SetText("Text Font Size: " .. (AscensionQuestTrackerDB.fontTextSize or 10))
---     sliderTFont:SetScript("OnValueChanged", function(self, value)
---         local val = math.floor(value)
---         AscensionQuestTrackerDB.fontTextSize = val
---         _G[self:GetName() .. "Text"]:SetText("Text Font Size: " .. val)
---         if AscensionQuestTrackerFrame and AscensionQuestTrackerFrame.FullUpdate then AscensionQuestTrackerFrame:FullUpdate() end
---     end)
-
---     -- 4. SLIDER: Line Spacing (Padding)
---     local sliderLineSp = CreateFrame("Slider", "AscensionQT_LineSpSlider", panel, "OptionsSliderTemplate")
---     sliderLineSp:SetPoint("TOPLEFT", sliderHFont, "BOTTOMLEFT", 0, -30)
---     sliderLineSp:SetMinMaxValues(0, 20)
---     sliderLineSp:SetValue(AscensionQuestTrackerDB.lineSpacing or 6)
---     sliderLineSp:SetValueStep(1)
---     sliderLineSp:SetObeyStepOnDrag(true)
---     _G[sliderLineSp:GetName() .. "Low"]:SetText("0")
---     _G[sliderLineSp:GetName() .. "High"]:SetText("20")
---     _G[sliderLineSp:GetName() .. "Text"]:SetText("Line Spacing: " .. (AscensionQuestTrackerDB.lineSpacing or 6))
---     sliderLineSp:SetScript("OnValueChanged", function(self, value)
---         local val = math.floor(value)
---         AscensionQuestTrackerDB.lineSpacing = val
---         _G[self:GetName() .. "Text"]:SetText("Line Spacing: " .. val)
---         if AscensionQuestTrackerFrame and AscensionQuestTrackerFrame.FullUpdate then AscensionQuestTrackerFrame:FullUpdate() end
---     end)
-
---     -- 5. SLIDER: Section Spacing
---     local sliderSecSp = CreateFrame("Slider", "AscensionQT_SecSpSlider", panel, "OptionsSliderTemplate")
---     sliderSecSp:SetPoint("LEFT", sliderLineSp, "RIGHT", 40, 0) -- Side by side
---     sliderSecSp:SetMinMaxValues(0, 50)
---     sliderSecSp:SetValue(AscensionQuestTrackerDB.sectionSpacing or 15)
---     sliderSecSp:SetValueStep(1)
---     sliderSecSp:SetObeyStepOnDrag(true)
---     _G[sliderSecSp:GetName() .. "Low"]:SetText("0")
---     _G[sliderSecSp:GetName() .. "High"]:SetText("50")
---     _G[sliderSecSp:GetName() .. "Text"]:SetText("Section Spacing: " .. (AscensionQuestTrackerDB.sectionSpacing or 15))
---     sliderSecSp:SetScript("OnValueChanged", function(self, value)
---         local val = math.floor(value)
---         AscensionQuestTrackerDB.sectionSpacing = val
---         _G[self:GetName() .. "Text"]:SetText("Section Spacing: " .. val)
---         if AscensionQuestTrackerFrame and AscensionQuestTrackerFrame.FullUpdate then AscensionQuestTrackerFrame:FullUpdate() end
---     end)
-
---     -- DESCRIPTION / HELP
---     local desc = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
---     desc:SetPoint("TOPLEFT", sliderScale, "BOTTOMLEFT", 0, -20)
---     desc:SetText("Note: To move the tracker, ensure 'Lock Position' is unchecked.\nDrag the tracker with Left Click.")
-    
---     -- Register to WoW Settings (Modern API support)
---     if Settings and Settings.RegisterCanvasLayoutCategory then
---         local category, layout = Settings.RegisterCanvasLayoutCategory(panel, "Ascension Quest Tracker")
---         Settings.RegisterAddOnCategory(category)
---     else
---         -- Fallback for older API versions
---         InterfaceOptions_AddCategory(panel)
---     end
--- end
-
--- -- Initialize Config on Login
--- local configLoader = CreateFrame("Frame")
--- configLoader:RegisterEvent("PLAYER_LOGIN")
--- configLoader:SetScript("OnEvent", function()
---     addonTable.LoadDatabase()
---     CreateOptionsPanel()
--- end)
-
 local addonName, ns = ...
-local AQT = ns.AQT
+local AQT = ns.AQT or {}
+ns.AQT = AQT
+local ASSETS = ns.ASSETS
 
 -- Helper to create a style group (Now strictly for Tabs)
 local function CreateStyleGroup(key, name, order, db)
@@ -235,21 +23,27 @@ local function CreateStyleGroup(key, name, order, db)
         order = order,
         args = {
             header = {
-                type = "header",
+                type = "header", 
                 name = name .. " Settings",
                 order = 0,
             },
-            headerSize = {
-                type = "range", name = "Header Font Size", min = 10, max = 30, step = 1, order = 1,
-                width = "full",
-                get = function() return db.profile.styles[key].headerSize end,
-                set = function(_, val) db.profile.styles[key].headerSize = val; AQT:FullUpdate() end,
+            titleSize = {
+                type = "range", name = "Title Font Size", min = 10, max = 30, step = 1, order = 1,
+                width = "full", -- Replaced headerSize
+                get = function() return db.profile.styles[key].titleSize end,
+                set = function(_, val) db.profile.styles[key].titleSize = val; AQT:FullUpdate() end,
             },
-            textSize = {
-                type = "range", name = "Text Font Size", min = 8, max = 24, step = 1, order = 2,
-                width = "full",
-                get = function() return db.profile.styles[key].textSize end,
-                set = function(_, val) db.profile.styles[key].textSize = val; AQT:FullUpdate() end,
+            descSize = {
+                type = "range", name = "Description Font Size", min = 8, max = 24, step = 1, order = 2,
+                width = "full", -- Replaced textSize
+                get = function() return db.profile.styles[key].descSize end,
+                set = function(_, val) db.profile.styles[key].descSize = val; AQT:FullUpdate() end,
+            },
+            objSize = {
+                type = "range", name = "Objectives Font Size", min = 8, max = 24, step = 1, order = 2.5,
+                width = "full", -- New
+                get = function() return db.profile.styles[key].objSize end,
+                set = function(_, val) db.profile.styles[key].objSize = val; AQT:FullUpdate() end,
             },
             barHeight = {
                 type = "range", name = "Bar Height", min = 2, max = 20, step = 1, order = 3,
@@ -263,7 +57,37 @@ local function CreateStyleGroup(key, name, order, db)
                 get = function() return db.profile.styles[key].lineSpacing end,
                 set = function(_, val) db.profile.styles[key].lineSpacing = val; AQT:FullUpdate() end,
             },
+            -- Per-Module Colors
+            h_cols = { type = "header", name = "Module Colors", order = 10 },
+            titleColor = {
+                type = "color", name = "Title Color", order = 11, hasAlpha = true,
+                get = function() local c = db.profile.styles[key].titleColor; return c.r, c.g, c.b, c.a end,
+                set = function(_, r, g, b, a) db.profile.styles[key].titleColor = {r=r, g=g, b=b, a=a}; AQT:FullUpdate() end,
+            },
+            barColor = {
+                type = "color", name = "Bar Color", order = 12, hasAlpha = true,
+                get = function() local c = db.profile.styles[key].barColor; return c.r, c.g, c.b, c.a end,
+                set = function(_, r, g, b, a) db.profile.styles[key].barColor = {r=r, g=g, b=b, a=a}; AQT:FullUpdate() end,
+            },
         }
+    }
+end
+
+local function CreateColorOption(key, name, order, db)
+    return {
+        type = "color",
+        name = name,
+        order = order,
+        hasAlpha = false,
+        get = function() 
+            local c = db.profile.colors[key]
+            return c.r, c.g, c.b, c.a 
+        end,
+        set = function(_, r, g, b, a) 
+            local c = db.profile.colors[key]
+            c.r, c.g, c.b, c.a = r, g, b, a
+            AQT:FullUpdate()
+        end,
     }
 end
 
@@ -304,7 +128,18 @@ function AQT:GetOptions()
                         get = function() return self.db.profile.hideOnBoss end,
                         set = function(_, val) self.db.profile.hideOnBoss = val; self:FullUpdate() end,
                     },
-
+                    autoSuperTrack = {
+                        type = "toggle", name = "Auto Super Track", desc = "Automatically track the nearest quest.", order = 1.31,
+                        get = function() return self.db.profile.autoSuperTrack end,
+                        set = function(_, val) self.db.profile.autoSuperTrack = val; self:FullUpdate() end,
+                    },
+                    showAllZoneHeaders = {
+                        type = "toggle", name = "Show Zone Headers", 
+                        desc = "Group side quests by zone with headers. If disabled, shows a flat list.", 
+                        order = 1.35,
+                        get = function() return self.db.profile.showAllZoneHeaders end,
+                        set = function(_, val) self.db.profile.showAllZoneHeaders = val; self:FullUpdate() end,
+                    },
                     -- Sliders
                     scale = {
                         type = "range", name = "Global Scale", min = 0.5, max = 2.0, step = 0.1, order = 2,
@@ -331,7 +166,40 @@ function AQT:GetOptions()
                         get = function() return self.db.profile.sectionSpacing end,
                         set = function(_, val) self.db.profile.sectionSpacing = val; self:FullUpdate() end,
                     },
-                }
+                    colors = {
+                        type = "group", name = "Colors", order = 2,
+                        args = {
+                            header = { type = "header", name = "Global Colors", order = 0 },
+                            
+                            headerColor = CreateColorOption("header", "Section Headers", 1, self.db),
+                            zoneColor = CreateColorOption("zone", "Zone Names", 2, self.db),
+                            questColor = CreateColorOption("quest", "Quest Titles (Normal)", 3, self.db),
+                            completeColor = CreateColorOption("complete", "Completed Quests", 4, self.db),
+                            campaignColor = CreateColorOption("campaign", "Campaign Quests", 5, self.db),
+                            wqColor = CreateColorOption("wq", "World Quests", 6, self.db),
+                            achColor = CreateColorOption("achievement", "Achievements", 7, self.db),
+                            sideQuestColor = CreateColorOption("sideQuest", "Objective Bars", 8, self.db),
+                        }
+                    },
+                    focusedOptions = {
+                        type = "group", name = "Focus / SuperTrack", order = 3, inline = true,
+                        args = {
+                             header = { type = "header", name = "Focus Settings", order = 0 },
+                             titleColor = {
+                                 type = "color", name = "Title Color", 
+                                 get = function() local c = self.db.profile.focused.titleColor; return c.r, c.g, c.b, c.a end,
+                                 set = function(_, r, g, b, a) self.db.profile.focused.titleColor = {r=r, g=g, b=b, a=a}; self:FullUpdate() end,
+                                 order = 1,
+                             },
+                             barColor = {
+                                 type = "color", name = "Bar Color", 
+                                 get = function() local c = self.db.profile.focused.barColor; return c.r, c.g, c.b, c.a end,
+                                 set = function(_, r, g, b, a) self.db.profile.focused.barColor = {r=r, g=g, b=b, a=a}; self:FullUpdate() end,
+                                 order = 2,
+                             },
+                        }
+                    },
+                },
             },
             
             -- Modular Style Tabs
@@ -360,9 +228,21 @@ function AQT:SetupOptions()
     
     self:RegisterChatCommand("aqt", function() 
         if categoryID then
-            Settings.OpenToCategory(categoryID)
+            if Settings and Settings.OpenToCategory then
+                -- Try passing the category ID first
+                local success = pcall(Settings.OpenToCategory, categoryID)
+                if not success then
+                    -- Fallback to searching by name if ID fails
+                    pcall(Settings.OpenToCategory, "Ascension Quest Tracker")
+                end
+            elseif InterfaceOptionsFrame_OpenToCategory then
+                InterfaceOptionsFrame_OpenToCategory(categoryID)
+            end
         else
-            Settings.OpenToCategory("Ascension Quest Tracker")
+            -- Check if Settings exists
+            if Settings and Settings.OpenToCategory then
+                Settings.OpenToCategory("Ascension Quest Tracker")
+            end
         end
     end)
 end

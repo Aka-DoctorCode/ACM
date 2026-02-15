@@ -2,7 +2,7 @@
 -- Project: AscensionQuestTracker
 -- Author: Aka-DoctorCode 
 -- File: Themes.lua
--- Version: 06
+-- Version: 07
 -------------------------------------------------------------------------------
 -- Copyright (c) 2025–2026 Aka-DoctorCode. All Rights Reserved.
 --
@@ -10,11 +10,13 @@
 -- No part of this file may be copied, modified, redistributed, or used in 
 -- derivative works without express written permission.
 -------------------------------------------------------------------------------
-local addonName, AQT = ...
+local addonName, ns = ...
+ns.AQT = ns.AQT or {}
+local AQT = ns.AQT
 
 AQT.Themes = {
     Default = {
-        font = "Fonts\\FRIZQT__.TTF",
+        font = nil, 
         fontHeaderSize = 13,
         fontTextSize = 10,
         barTexture = "Interface\\Buttons\\WHITE8x8",
@@ -54,6 +56,7 @@ AQT.Themes = {
 
 -- Current active theme alias
 AQT.ASSETS = AQT.Themes.Default
+ns.ASSETS = AQT.ASSETS
 
 function AQT:UpdateTheme()
     -- Placeholder for dynamic theme switching

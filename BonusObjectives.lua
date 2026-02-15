@@ -2,7 +2,7 @@
 -- Project: AscensionQuestTracker
 -- Author: Aka-DoctorCode 
 -- File: BonusObjectives.lua
--- Version: 06
+-- Version: 07
 -------------------------------------------------------------------------------
 -- Copyright (c) 2025–2026 Aka-DoctorCode. All Rights Reserved.
 --
@@ -11,7 +11,8 @@
 -- derivative works without express written permission.
 -------------------------------------------------------------------------------
 local addonName, ns = ...
-local AQT = ns.AQT
+local AQT = ns.AQT or {}
+ns.AQT = AQT
 local ASSETS = ns.ASSETS
 
 -- Renders the progress bar for Bonus Objectives and World Quests
