@@ -1,0 +1,7 @@
+<h1>V08</h1>
+<ul>
+    <li>Packager update to BigWigsMods/packager/li>
+    <li>Nil check resolve</li>
+    <li>Undefied Globals resolve</li>
+    <li>TOC update</li>
+</ul>

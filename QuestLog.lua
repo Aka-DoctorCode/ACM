@@ -4,6 +4,7 @@
 -- File: QuestLog.lua
 -- Version: 07
 -------------------------------------------------------------------------------
+---@diagnostic disable: undefined-global, missing-parameter
 -- Copyright (c) 2025–2026 Aka-DoctorCode. All Rights Reserved.
 --
 -- This software and its source code are the exclusive property of the author.

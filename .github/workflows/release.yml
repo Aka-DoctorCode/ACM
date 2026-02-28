@@ -1,0 +1,29 @@
+name: Package and Release
+
+permissions:
+  contents: write
+
+on:
+  push:
+    tags:
+      - '*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Build and Deploy
+        uses: BigWigsMods/packager@v2
+        env:
+          CF_API_KEY: ${{ secrets.CF_API_KEY }}
+          GITHUB_OAUTH: ${{ secrets.GITHUB_TOKEN }}
+      
+      # - name: Create Package
+      #   uses: BigWigsMods/packager@master
+      #   env:
+      #     WAGO_API_TOKEN: ${{ secrets.WAGO_API_TOKEN }}

@@ -1,21 +1,13 @@
 ## Interface: 120001
 ## Title: Ascension Quest Tracker
-## Notes: Minimalistic substitute for the default quest tracker.
-## Author: AkaDoctorCode
-## Version: 07
+## Notes: Minimalistic quest tracker.
+## Author: Aka-DoctorCode
+## Category: Interface
+## Version: @project-version@
 ## SavedVariables: AscensionQuestTrackerDB
-## IconTexture: Interface\AddOns\AscensionNotes\Media\AkaDoctorCode.png
-
-# Libraries
-Libs\LibStub\LibStub.lua
-Libs\CallbackHandler-1.0\CallbackHandler-1.0\CallbackHandler-1.0.xml
-Libs\AceAddon-3.0\AceAddon-3.0.xml
-Libs\AceEvent-3.0\AceEvent-3.0.xml
-Libs\AceDB-3.0\AceDB-3.0.xml
-Libs\AceDBOptions-3.0\AceDBOptions-3.0.xml
-Libs\AceConsole-3.0\AceConsole-3.0.xml
-Libs\AceGUI-3.0\AceGUI-3.0.xml
-Libs\AceConfig-3.0\AceConfig-3.0.xml
+## IconTexture: Interface\AddOns\AscensionQuestTracker\Media\AkaDoctorCode.png
+## X-Curse-Project-ID: 1419831
+# X-Wago-ID: 
 
 # Core Files
 Core.lua
